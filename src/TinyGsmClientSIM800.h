@@ -45,6 +45,209 @@ enum TinyGSMDateTimeFormat {
   DATE_DATE = 2
 };
 
+template<int N = 64>
+struct MyString : public Printable {
+	char strBuf[N];
+	int index;
+	MyString() : index(0) { memset(strBuf, 0, sizeof(char) * N); }
+	MyString(const char* val) : index(0) {
+		strncpy(strBuf, val, N);
+		index += strlen(val);
+	}
+	MyString(const MyString& rhs) {
+		memcpy(strBuf, rhs.strBuf, sizeof(char) * N);
+		index = rhs.index;
+	}
+	MyString& operator+=(uint8_t val) {
+		itoa(val, strBuf + index, 10);
+		index = strlen(strBuf);
+		return *this;
+	}
+
+	MyString& operator=(const MyString& rhs) {
+		memcpy(strBuf, rhs.strBuf, sizeof(char) * N);
+		index = rhs.index;
+	}
+	MyString& operator+=(const char* val) {
+		strncpy(strBuf + index, val, N - index);
+		index = strlen(strBuf);
+		return *this;
+	}
+
+	MyString& operator+=(char val) {
+		strBuf[index] = val;
+		index++;
+		return *this;
+	}
+	template<int F>
+	MyString& operator+=(MyString<F>& str) {
+		strncpy(strBuf + index, str.strBuf, N - index);
+		index += min(str.index + index, N);
+		return *this;
+	}
+
+	int length() {
+		return index;
+	}
+
+	virtual size_t printTo(Print& p) const {
+		return p.write(strBuf, index);
+	}
+	void ltrim() {
+		while (strBuf[0] == ' ') {
+			for (int i = 0; i < (N - 1); i++) {
+				strBuf[i] = strBuf[i + 1];
+			}
+			index--;
+		}
+	}
+
+	void rtrim() {
+		while (strBuf[index - 1] == ' ' && index > 0) {
+			strBuf[index - 1] = '\0';
+			index--;
+		}
+	}
+
+	void trim() {
+		ltrim();
+		rtrim();
+	}
+	MyString<N> substring(int start, int count) {
+		if (start >= 0 && start < index && (count + start) < index && count < N) {
+			MyString<N> tmp;
+			strncpy(tmp.strBuf, &strBuf[start], sizeof(char) * count);
+			return tmp;
+		}
+		return {};
+	}
+	void reserve(int r) { }
+	void replace(const char* str, const char* r) {
+		int foundIndex = -1;
+		int fLen = strlen(str);
+		int rLen = strlen(r);
+		while ((foundIndex = indexOf(str, foundIndex + 1)) != -1) {
+			if (fLen == rLen) {
+				for (int i = 0; i < rLen; i++) {
+					strBuf[foundIndex + i] = r[i];
+				}
+			}
+			else if (fLen > rLen) {
+				for (int i = 0; i < rLen; i++) {
+					strBuf[foundIndex + i] = r[i];
+				}
+				int diff = fLen - rLen;
+				while (diff--) {
+					for (int i = foundIndex + diff + rLen; i < (N - 1); i++) {
+						strBuf[i] = strBuf[i + 1];
+					}
+				}
+				index = strlen(strBuf);
+			}
+			else {
+				int diff = rLen - fLen;
+				for (int i = 0; i < diff; i++) {
+					for (int j = (N - 2); j >= i + fLen + foundIndex; j--) {
+						strBuf[j + 1] = strBuf[j];
+					}
+				}
+				for (int i = 0; i < rLen; i++) {
+					strBuf[foundIndex + i] = r[i];
+				}
+				foundIndex += rLen - 1;
+				index = strlen(strBuf);
+			}
+		}
+	}
+	static MyString<> fromStreamUntil(Stream& s, char terminator) {
+		MyString<> res;
+		res.readFromStreamUntil(s, terminator);
+		return res;
+	}
+	int toInt() {
+		return atoi(strBuf);
+	}
+	bool endsWith(const char* str) {
+		auto len = strlen(str);
+		if (len > index) {
+			return false;
+		}
+		int cnt = 0;
+		const int offset = index - len;
+		for (int i = offset; i < index; i++) {
+			if (strBuf[i] == str[i - offset]) {
+				cnt++;
+			}
+		}
+		return cnt == len;
+	}
+
+#ifdef ARDUINO
+	bool endsWith(const __FlashStringHelper* str) {
+		char buf[N];
+		strcpy_P(buf, (const char*)str);
+		return endsWith(buf);
+	}
+#endif
+
+	int lastIndexOf(const char* str, int backIndex) {
+		if (backIndex > index || index <= 0) {
+			return -1;
+		}
+		int len = strlen(str);
+		if (len > index || len == 0 || backIndex + len > index) {
+			return -1;
+		}
+		for (int i = backIndex; i > 0; i--) {
+			int cnt = 0;
+			for (int j = 0; j < len; j++) {
+				if (strBuf[i + j] == str[j]) {
+					cnt++;
+				}
+				else {
+					break;
+				}
+			}
+			if (cnt == len) {
+				return i;
+			}
+		}
+		return -1;
+	}
+	int indexOf(const char* str, int startIndex) {
+		if (startIndex > index || index <= 0) {
+			return -1;
+		}
+		int len = strlen(str);
+		if (len > index || len == 0) {
+			return -1;
+		}
+		for (int i = startIndex; i <= (index - len); i++) {
+			int cnt = 0;
+			for (int j = 0; j < len; j++) {
+				if (strBuf[i + j] == str[j]) {
+					cnt++;
+				}
+				else {
+					break;
+				}
+			}
+			if (cnt == len) {
+				return i;
+			}
+		}
+		return -1;
+	}
+	const char* c_str() {
+		return strBuf;
+	}
+#ifdef ARDUINO
+	void readFromStreamUntil(Stream& stream, char terminator) {
+		index += stream.readBytesUntil(terminator, strBuf + index, N - index);
+	}
+#endif
+};
+
 class TinyGsmSim800
 {
 
@@ -85,7 +288,7 @@ public:
   }
 
   virtual int connect(IPAddress ip, uint16_t port) {
-    String host; host.reserve(16);
+    MyString<16> host;
     host += ip[0];
     host += ".";
     host += ip[1];
@@ -93,6 +296,7 @@ public:
     host += ip[2];
     host += ".";
     host += ip[3];
+	Serial.println(host.c_str());
     return connect(host.c_str(), port);
   }
 
@@ -285,9 +489,9 @@ public:
     return waitResponse() == 1;
   }
 
-  String getModemInfo() {
+  MyString<> getModemInfo() {
     sendAT(GF("I"));
-    String res;
+    MyString<> res;
     if (waitResponse(1000L, res) != 1) {
       return "";
     }
@@ -370,23 +574,25 @@ public:
     return waitResponse() == 1;
   }
 
-  String getSimCCID() {
+  MyString<> getSimCCID() {
     sendAT(GF("+ICCID"));
     if (waitResponse(GF(GSM_NL "+ICCID:")) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+	MyString<> res;
+	res.readFromStreamUntil(stream, '\n');
     waitResponse();
     res.trim();
     return res;
   }
 
-  String getIMEI() {
+  MyString<> getIMEI() {
     sendAT(GF("+GSN"));
     if (waitResponse(GF(GSM_NL)) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+	MyString<> res;
+	res.readFromStreamUntil(stream, '\n');
     waitResponse();
     res.trim();
     return res;
@@ -417,18 +623,19 @@ public:
       return REG_UNKNOWN;
     }
     streamSkipUntil(','); // Skip format (0)
-    int status = stream.readStringUntil('\n').toInt();
+	MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
+    int status = res.toInt();
     waitResponse();
     return (RegStatus)status;
   }
 
-  String getOperator() {
+  MyString<> getOperator() {
     sendAT(GF("+COPS?"));
     if (waitResponse(GF(GSM_NL "+COPS:")) != 1) {
       return "";
     }
     streamSkipUntil('"'); // Skip mode and format
-    String res = stream.readStringUntil('"');
+    MyString<> res = MyString<64>::fromStreamUntil(stream, '"');
     waitResponse();
     return res;
   }
@@ -442,7 +649,7 @@ public:
     if (waitResponse(GF(GSM_NL "+CSQ:")) != 1) {
       return 99;
     }
-    int res = stream.readStringUntil(',').toInt();
+    int res = MyString<>::fromStreamUntil(stream, ',').toInt();
     waitResponse();
     return res;
   }
@@ -570,7 +777,7 @@ public:
     if (waitResponse(GF(GSM_NL "+CGATT:")) != 1) {
       return false;
     }
-    int res = stream.readStringUntil('\n').toInt();
+    int res = MyString<>::fromStreamUntil(stream, '\n').toInt();
     waitResponse();
     if (res != 1)
       return false;
@@ -582,9 +789,9 @@ public:
     return true;
   }
 
-  String getLocalIP() {
+  MyString<> getLocalIP() {
     sendAT(GF("+CIFSR;E0"));
-    String res;
+    MyString<> res;
     if (waitResponse(10000L, res) != 1) {
       return "";
     }
@@ -595,7 +802,8 @@ public:
   }
 
   IPAddress localIP() {
-    return TinyGsmIpFromString(getLocalIP());
+    //return TinyGsmIpFromString(getLocalIP());
+	  return IPAddress();
   }
 
   /*
@@ -613,24 +821,6 @@ public:
   }
 
   // Returns true on pick-up, false on error/busy
-  bool callNumber(const String& number) {
-    if (number == GF("last")) {
-      sendAT(GF("DL"));
-    } else {
-      sendAT(GF("D"), number, ";");
-    }
-    int status = waitResponse(60000L,
-                              GFP(GSM_OK),
-                              GF("BUSY" GSM_NL),
-                              GF("NO ANSWER" GSM_NL),
-                              GF("NO CARRIER" GSM_NL));
-    switch (status) {
-    case 1:  return true;
-    case 2:
-    case 3:  return false;
-    default: return false;
-    }
-  }
 
   bool callHangup() {
     sendAT(GF("H"));
@@ -652,86 +842,12 @@ public:
    * Messaging functions
    */
 
-  String sendUSSD(const String& code) {
-    sendAT(GF("+CMGF=1"));
-    waitResponse();
-    sendAT(GF("+CSCS=\"HEX\""));
-    waitResponse();
-    sendAT(GF("+CUSD=1,\""), code, GF("\""));
-    if (waitResponse() != 1) {
-      return "";
-    }
-    if (waitResponse(10000L, GF(GSM_NL "+CUSD:")) != 1) {
-      return "";
-    }
-    stream.readStringUntil('"');
-    String hex = stream.readStringUntil('"');
-    stream.readStringUntil(',');
-    int dcs = stream.readStringUntil('\n').toInt();
-
-    if (dcs == 15) {
-      return TinyGsmDecodeHex8bit(hex);
-    } else if (dcs == 72) {
-      return TinyGsmDecodeHex16bit(hex);
-    } else {
-      return hex;
-    }
-  }
-
-  bool sendSMS(const String& number, const String& text) {
-    sendAT(GF("+CMGF=1"));
-    waitResponse();
-    //Set GSM 7 bit default alphabet (3GPP TS 23.038)
-    sendAT(GF("+CSCS=\"GSM\""));
-    waitResponse();
-    sendAT(GF("+CMGS=\""), number, GF("\""));
-    if (waitResponse(GF(">")) != 1) {
-      return false;
-    }
-    stream.print(text);
-    stream.write((char)0x1A);
-    stream.flush();
-    return waitResponse(60000L) == 1;
-  }
-
-  bool sendSMS_UTF16(const String& number, const void* text, size_t len) {
-    sendAT(GF("+CMGF=1"));
-    waitResponse();
-    sendAT(GF("+CSCS=\"HEX\""));
-    waitResponse();
-    sendAT(GF("+CSMP=17,167,0,8"));
-    waitResponse();
-
-    sendAT(GF("+CMGS=\""), number, GF("\""));
-    if (waitResponse(GF(">")) != 1) {
-      return false;
-    }
-
-    uint16_t* t = (uint16_t*)text;
-    for (size_t i=0; i<len; i++) {
-      uint8_t c = t[i] >> 8;
-      if (c < 0x10) { stream.print('0'); }
-      stream.print(c, HEX);
-      c = t[i] & 0xFF;
-      if (c < 0x10) { stream.print('0'); }
-      stream.print(c, HEX);
-    }
-    stream.write((char)0x1A);
-    stream.flush();
-    return waitResponse(60000L) == 1;
-  }
-
-
-  /*
-   * Location functions
-   */
-
-  String getGsmLocation() {
+   MyString<> getGsmLocation() {
     sendAT(GF("+CIPGSMLOC=1,1"));
     if (waitResponse(10000L, GF(GSM_NL "+CIPGSMLOC:")) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+    MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
     waitResponse();
     res.trim();
     return res;
@@ -740,24 +856,24 @@ public:
   /*
    * Time functions
    */
-  String getGSMDateTime(TinyGSMDateTimeFormat format) {
+  MyString<> getGSMDateTime(TinyGSMDateTimeFormat format) {
     sendAT(GF("+CCLK?"));
     if (waitResponse(2000L, GF(GSM_NL "+CCLK: \"")) != 1) {
       return "";
     }
 
-    String res;
+    MyString<> res;
 
     switch(format) {
       case DATE_FULL:
-        res = stream.readStringUntil('"');
+        res = MyString<>::fromStreamUntil(stream, '"');
       break;
       case DATE_TIME:
         streamSkipUntil(',');
-        res = stream.readStringUntil('"');
+        res = MyString<>::fromStreamUntil(stream, '"');
       break;
       case DATE_DATE:
-        res = stream.readStringUntil(',');
+        res = MyString<>::fromStreamUntil(stream, ',');
       break;
     }
     return res;
@@ -775,7 +891,7 @@ public:
     streamSkipUntil(','); // Skip
     streamSkipUntil(','); // Skip
 
-    uint16_t res = stream.readStringUntil(',').toInt();
+    uint16_t res = MyString<>::fromStreamUntil(stream, ',').toInt();
     waitResponse();
     return res;
   }
@@ -785,8 +901,8 @@ public:
     if (waitResponse(GF(GSM_NL "+CBC:")) != 1) {
       return false;
     }
-    stream.readStringUntil(',');
-    int res = stream.readStringUntil(',').toInt();
+	streamSkipUntil(',');
+    int res = MyString<>::fromStreamUntil(stream, ',').toInt();
     waitResponse();
     return res;
   }
@@ -824,7 +940,7 @@ protected:
       return 0;
     }
     streamSkipUntil(','); // Skip mux
-    return stream.readStringUntil('\n').toInt();
+    return MyString<>::fromStreamUntil(stream, '\n').toInt();
   }
 
   size_t modemRead(size_t size, uint8_t mux) {
@@ -841,8 +957,8 @@ protected:
 #endif
     streamSkipUntil(','); // Skip mode 2/3
     streamSkipUntil(','); // Skip mux
-    size_t len = stream.readStringUntil(',').toInt();
-    sockets[mux]->sock_available = stream.readStringUntil('\n').toInt();
+    size_t len = MyString<>::fromStreamUntil(stream, ',').toInt();
+    sockets[mux]->sock_available = MyString<>::fromStreamUntil(stream, '\n').toInt();
 
     for (size_t i=0; i<len; i++) {
 #ifdef TINY_GSM_USE_HEX
@@ -867,7 +983,7 @@ protected:
     if (waitResponse(GF("+CIPRXGET:")) == 1) {
       streamSkipUntil(','); // Skip mode 4
       streamSkipUntil(','); // Skip mux
-      result = stream.readStringUntil('\n').toInt();
+      result = MyString<>::fromStreamUntil(stream, '\n').toInt();
       waitResponse();
     }
     if (!result) {
@@ -919,7 +1035,8 @@ public:
   }
 
   // TODO: Optimize this!
-  uint8_t waitResponse(uint32_t timeout, String& data,
+  template<int N = 64>
+  uint8_t waitResponse(uint32_t timeout, MyString<N>& data,
                        GsmConstStr r1=GFP(GSM_OK), GsmConstStr r2=GFP(GSM_ERROR),
                        GsmConstStr r3=NULL, GsmConstStr r4=NULL, GsmConstStr r5=NULL)
   {
@@ -929,7 +1046,24 @@ public:
     String r4s(r4); r4s.trim();
     String r5s(r5); r5s.trim();
     DBG("### ..:", r1s, ",", r2s, ",", r3s, ",", r4s, ",", r5s);*/
-    data.reserve(64);
+	  /*
+	Serial.print("Wait response start"); 
+	if (r1) {
+		Serial.print(" r1: "); Serial.print(r1);
+	}
+	if (r2) {
+		Serial.print(" r2: "); Serial.print(r2);
+	}
+	if (r3) {
+		Serial.print(" r3: "); Serial.print(r3);
+	}
+	if (r4) {
+		Serial.print(" r4: "); Serial.print(r4);
+	}
+	if (r5) {
+		Serial.print(" r5: "); Serial.println(r5);
+	}
+	*/
     int index = 0;
     unsigned long startMillis = millis();
     do {
@@ -937,6 +1071,7 @@ public:
       while (stream.available() > 0) {
         int a = stream.read();
         if (a <= 0) continue; // Skip 0x00 bytes, just in case
+		//Serial.print("read:"); Serial.println((char)a);
         data += (char)a;
         if (r1 && data.endsWith(r1)) {
           index = 1;
@@ -954,7 +1089,8 @@ public:
           index = 5;
           goto finish;
         } else if (data.endsWith(GF(GSM_NL "+CIPRXGET:"))) {
-          String mode = stream.readStringUntil(',');
+          MyString<> mode;
+		  mode.readFromStreamUntil(stream, ',');
           if (mode.toInt() == 1) {
             int mux = stream.readStringUntil('\n').toInt();
             if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
@@ -991,7 +1127,7 @@ finish:
                        GsmConstStr r1=GFP(GSM_OK), GsmConstStr r2=GFP(GSM_ERROR),
                        GsmConstStr r3=NULL, GsmConstStr r4=NULL, GsmConstStr r5=NULL)
   {
-    String data;
+    MyString<> data;
     return waitResponse(timeout, data, r1, r2, r3, r4, r5);
   }
 
