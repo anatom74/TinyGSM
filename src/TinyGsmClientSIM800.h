@@ -52,7 +52,7 @@ struct MyString : public Printable {
 	MyString() : index(0) { memset(strBuf, 0, sizeof(char) * N); }
 	MyString(const char* val) : index(0) {
 		strncpy(strBuf, val, N);
-		index += strlen(val);
+		index = strlen(val);
 	}
 	MyString(const MyString& rhs) {
 		memcpy(strBuf, rhs.strBuf, sizeof(char) * N);
@@ -68,6 +68,7 @@ struct MyString : public Printable {
 		memcpy(strBuf, rhs.strBuf, sizeof(char) * N);
 		index = rhs.index;
 	}
+	
 	MyString& operator+=(const char* val) {
 		strncpy(strBuf + index, val, N - index);
 		index = strlen(strBuf);
@@ -185,6 +186,7 @@ struct MyString : public Printable {
 #ifdef ARDUINO
 	bool endsWith(const __FlashStringHelper* str) {
 		char buf[N];
+		memset(buf, 0, N);
 		strcpy_P(buf, (const char*)str);
 		return endsWith(buf);
 	}
@@ -214,6 +216,13 @@ struct MyString : public Printable {
 		}
 		return -1;
 	}
+	// int indexOf(const __FlashStringHelper* str, int startIndex) {
+	// 	char buf[N];
+	// 	memset(buf, 0, N);
+	// 	strcpy_P(buf, (const char*)str);
+	// 	return indexOf(buf, startIndex);
+	// }
+
 	int indexOf(const char* str, int startIndex) {
 		if (startIndex > index || index <= 0) {
 			return -1;
@@ -243,7 +252,7 @@ struct MyString : public Printable {
 	}
 #ifdef ARDUINO
 	void readFromStreamUntil(Stream& stream, char terminator) {
-		index += stream.readBytesUntil(terminator, strBuf + index, N - index);
+		index += stream.readBytesUntil(terminator, strBuf + index, N - index -1);
 	}
 #endif
 };
@@ -296,7 +305,6 @@ public:
     host += ip[2];
     host += ".";
     host += ip[3];
-	Serial.println(host.c_str());
     return connect(host.c_str(), port);
   }
 
@@ -959,7 +967,6 @@ protected:
     streamSkipUntil(','); // Skip mux
     size_t len = MyString<>::fromStreamUntil(stream, ',').toInt();
     sockets[mux]->sock_available = MyString<>::fromStreamUntil(stream, '\n').toInt();
-
     for (size_t i=0; i<len; i++) {
 #ifdef TINY_GSM_USE_HEX
       while (stream.available() < 2) { TINY_GSM_YIELD(); }
@@ -968,7 +975,16 @@ protected:
       buf[1] = stream.read();
       char c = strtol(buf, NULL, 16);
 #else
-      while (!stream.available()) { TINY_GSM_YIELD(); }
+	  long lastChecked = millis();
+      while (!stream.available()) { 
+		  TINY_GSM_YIELD(); 
+		  if (millis() - lastChecked > 10000) {
+			  sockets[mux]->sock_available = 0;
+			  sockets[mux]->sock_connected = false;
+			  sockets[mux]->got_data = false;
+			  return i;
+		  }
+	  }
       char c = stream.read();
 #endif
       sockets[mux]->rx.put(c);
@@ -983,7 +999,8 @@ protected:
     if (waitResponse(GF("+CIPRXGET:")) == 1) {
       streamSkipUntil(','); // Skip mode 4
       streamSkipUntil(','); // Skip mux
-      result = MyString<>::fromStreamUntil(stream, '\n').toInt();
+	  auto string = MyString<>::fromStreamUntil(stream, '\n');
+	  result = string.toInt();
       waitResponse();
     }
     if (!result) {
@@ -1092,7 +1109,7 @@ public:
           MyString<> mode;
 		  mode.readFromStreamUntil(stream, ',');
           if (mode.toInt() == 1) {
-            int mux = stream.readStringUntil('\n').toInt();
+            int mux = MyString<>::fromStreamUntil(stream, '\n').toInt();
             if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
               sockets[mux]->got_data = true;
             }
@@ -1102,13 +1119,24 @@ public:
           }
         } else if (data.endsWith(GF("CLOSED" GSM_NL))) {
           int nl = data.lastIndexOf(GSM_NL, data.length()-8);
-          int coma = data.indexOf(',', nl+2);
+          int coma = data.indexOf(",", nl+2);
           int mux = data.substring(nl+2, coma).toInt();
           if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
             sockets[mux]->sock_connected = false;
           }
           data = "";
           DBG("### Closed: ", mux);
+        } else if(data.endsWith(GF("REMOTE CLOSING\""))) {
+			auto start_of = data.indexOf("CIPSTATUS:", 0) + 10;
+			auto comma = data.indexOf(",", start_of);
+
+			auto mux_str = data.substring(start_of, comma - start_of);
+			auto mux = mux_str.toInt();
+			if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
+				sockets[mux]->sock_connected = false;
+			}
+			data = "";
+			index = 2;
         }
       }
     } while (millis() - startMillis < timeout);
@@ -1128,13 +1156,15 @@ finish:
                        GsmConstStr r3=NULL, GsmConstStr r4=NULL, GsmConstStr r5=NULL)
   {
     MyString<> data;
-    return waitResponse(timeout, data, r1, r2, r3, r4, r5);
+	auto res = waitResponse(timeout, data, r1, r2, r3, r4, r5);
+	return res;
   }
 
   uint8_t waitResponse(GsmConstStr r1=GFP(GSM_OK), GsmConstStr r2=GFP(GSM_ERROR),
                        GsmConstStr r3=NULL, GsmConstStr r4=NULL, GsmConstStr r5=NULL)
   {
-    return waitResponse(1000, r1, r2, r3, r4, r5);
+	auto res = waitResponse(1000, r1, r2, r3, r4, r5);
+	return res;
   }
 
 public:
