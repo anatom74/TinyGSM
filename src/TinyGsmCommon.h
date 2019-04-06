@@ -204,6 +204,10 @@ struct MyString : public Printable {
 	int toInt() {
 		return atoi(strBuf);
 	}
+	float toFloat() {
+		return atof(strBuf);
+	}
+
 	bool endsWith(const char* str) {
 		auto len = strlen(str);
 		if (len > index) {
