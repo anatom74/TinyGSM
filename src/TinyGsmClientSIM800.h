@@ -43,217 +43,7 @@ enum TinyGSMDateTimeFormat {
 };
 
 
-template<int N = 64>
-struct MyString : public Printable {
-	char strBuf[N];
-	int index;
-	MyString() : index(0) { memset(strBuf, 0, sizeof(char) * N); }
-	MyString(const char* val) : index(0) {
-		strncpy(strBuf, val, N);
-		index = strlen(val);
-	}
-	MyString(const MyString& rhs) {
-		memcpy(strBuf, rhs.strBuf, sizeof(char) * N);
-		index = rhs.index;
-	}
-	MyString& operator+=(uint8_t val) {
-		itoa(val, strBuf + index, 10);
-		index = strlen(strBuf);
-		return *this;
-	}
 
-	MyString& operator=(const MyString& rhs) {
-		memcpy(strBuf, rhs.strBuf, sizeof(char) * N);
-		index = rhs.index;
-	}
-
-	MyString& operator+=(const char* val) {
-		strncpy(strBuf + index, val, N - index);
-		index = strlen(strBuf);
-		return *this;
-	}
-
-	MyString& operator+=(char val) {
-		strBuf[index] = val;
-		index++;
-		return *this;
-	}
-	template<int F>
-	MyString& operator+=(MyString<F>& str) {
-		strncpy(strBuf + index, str.strBuf, N - index);
-		index += min(str.index + index, N);
-		return *this;
-	}
-
-	int length() {
-		return index;
-	}
-
-	virtual size_t printTo(Print& p) const {
-		return p.write(strBuf, index);
-	}
-	void ltrim() {
-		while (strBuf[0] == ' ') {
-			for (int i = 0; i < (N - 1); i++) {
-				strBuf[i] = strBuf[i + 1];
-			}
-			index--;
-		}
-	}
-
-	void rtrim() {
-		while (strBuf[index - 1] == ' ' && index > 0) {
-			strBuf[index - 1] = '\0';
-			index--;
-		}
-	}
-
-	void trim() {
-		ltrim();
-		rtrim();
-	}
-	MyString<N> substring(int start, int count) {
-		if (start >= 0 && start < index && (count + start) < index && count < N) {
-			MyString<N> tmp;
-			strncpy(tmp.strBuf, &strBuf[start], sizeof(char) * count);
-			return tmp;
-		}
-		return {};
-	}
-	void reserve(int r) { }
-	void replace(const char* str, const char* r) {
-		int foundIndex = -1;
-		int fLen = strlen(str);
-		int rLen = strlen(r);
-		while ((foundIndex = indexOf(str, foundIndex + 1)) != -1) {
-			if (fLen == rLen) {
-				for (int i = 0; i < rLen; i++) {
-					strBuf[foundIndex + i] = r[i];
-				}
-			}
-			else if (fLen > rLen) {
-				for (int i = 0; i < rLen; i++) {
-					strBuf[foundIndex + i] = r[i];
-				}
-				int diff = fLen - rLen;
-				while (diff--) {
-					for (int i = foundIndex + diff + rLen; i < (N - 1); i++) {
-						strBuf[i] = strBuf[i + 1];
-					}
-				}
-				index = strlen(strBuf);
-			}
-			else {
-				int diff = rLen - fLen;
-				for (int i = 0; i < diff; i++) {
-					for (int j = (N - 2); j >= i + fLen + foundIndex; j--) {
-						strBuf[j + 1] = strBuf[j];
-					}
-				}
-				for (int i = 0; i < rLen; i++) {
-					strBuf[foundIndex + i] = r[i];
-				}
-				foundIndex += rLen - 1;
-				index = strlen(strBuf);
-			}
-		}
-	}
-	static MyString<> fromStreamUntil(Stream& s, char terminator) {
-		MyString<> res;
-		res.readFromStreamUntil(s, terminator);
-		return res;
-	}
-	int toInt() {
-		return atoi(strBuf);
-	}
-	bool endsWith(const char* str) {
-		auto len = strlen(str);
-		if (len > index) {
-			return false;
-		}
-		int cnt = 0;
-		const int offset = index - len;
-		for (int i = offset; i < index; i++) {
-			if (strBuf[i] == str[i - offset]) {
-				cnt++;
-			}
-		}
-		return cnt == len;
-	}
-
-#ifdef ARDUINO
-	bool endsWith(const __FlashStringHelper* str) {
-		char buf[N];
-		memset(buf, 0, N);
-		strcpy_P(buf, (const char*)str);
-		return endsWith(buf);
-	}
-#endif
-
-	int lastIndexOf(const char* str, int backIndex) {
-		if (backIndex > index || index <= 0) {
-			return -1;
-		}
-		int len = strlen(str);
-		if (len > index || len == 0 || backIndex + len > index) {
-			return -1;
-		}
-		for (int i = backIndex; i > 0; i--) {
-			int cnt = 0;
-			for (int j = 0; j < len; j++) {
-				if (strBuf[i + j] == str[j]) {
-					cnt++;
-				}
-				else {
-					break;
-				}
-			}
-			if (cnt == len) {
-				return i;
-			}
-		}
-		return -1;
-	}
-	// int indexOf(const __FlashStringHelper* str, int startIndex) {
-	// 	char buf[N];
-	// 	memset(buf, 0, N);
-	// 	strcpy_P(buf, (const char*)str);
-	// 	return indexOf(buf, startIndex);
-	// }
-
-	int indexOf(const char* str, int startIndex) {
-		if (startIndex > index || index <= 0) {
-			return -1;
-		}
-		int len = strlen(str);
-		if (len > index || len == 0) {
-			return -1;
-		}
-		for (int i = startIndex; i <= (index - len); i++) {
-			int cnt = 0;
-			for (int j = 0; j < len; j++) {
-				if (strBuf[i + j] == str[j]) {
-					cnt++;
-				}
-				else {
-					break;
-				}
-			}
-			if (cnt == len) {
-				return i;
-			}
-		}
-		return -1;
-	}
-	const char* c_str() {
-		return strBuf;
-	}
-#ifdef ARDUINO
-	void readFromStreamUntil(Stream& stream, char terminator) {
-		index += stream.readBytesUntil(terminator, strBuf + index, N - index -1);
-	}
-#endif
-};
 
 class TinyGsmSim800 : public TinyGsmModem
 {
@@ -469,7 +259,7 @@ public:
     return true;
   }
 
-  String getModemName() {
+  MyString<> getModemName() {
     #if defined(TINY_GSM_MODEM_SIM800)
       return "SIMCom SIM800";
     #elif defined(TINY_GSM_MODEM_SIM808)
@@ -825,7 +615,7 @@ public:
   /*
    * IP Address functions
    */
-
+    MyString<> getLocalIP() {
     sendAT(GF("+CIFSR;E0"));
     MyString<> res;
     if (waitResponse(10000L, res) != 1) {
