@@ -150,7 +150,7 @@ public:
     TINY_GSM_YIELD();
     at->maintain();
     size_t cnt = 0;
-    while (cnt < size) {
+    while (cnt < size && sock_connected) {
       size_t chunk = TinyGsmMin(size-cnt, rx.size());
       if (chunk > 0) {
         rx.get(buf, chunk);
@@ -259,7 +259,7 @@ public:
     return true;
   }
 
-  String getModemName() {
+  MyString<> getModemName() {
     return "SIMCom SIM7000";
   }
 
@@ -294,7 +294,7 @@ public:
     return false;
   }
 
-  String getModemInfo() {
+  MyString<> getModemInfo() {
     sendAT(GF("I"));
     String res;
     if (waitResponse(1000L, res) != 1) {
@@ -378,7 +378,7 @@ public:
     return waitResponse() == 1;
   }
 
-  String getSimCCID() {
+  MyString<> getSimCCID() {
     sendAT(GF("+ICCID"));
     if (waitResponse(GF(GSM_NL "+ICCID:")) != 1) {
       return "";
@@ -389,12 +389,13 @@ public:
     return res;
   }
 
-  String getIMEI() {
+  MyString<> getIMEI() {
     sendAT(GF("+GSN"));
     if (waitResponse(GF(GSM_NL)) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+	MyString<> res;
+	res.readFromStreamUntil(stream, '\n');									   
     waitResponse();
     res.trim();
     return res;
@@ -425,19 +426,20 @@ public:
       return REG_UNKNOWN;
     }
     streamSkipUntil(','); // Skip format (0)
-    int status = stream.readStringUntil('\n').toInt();
+	MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
+    int status = res.toInt();
     waitResponse();
     return (RegStatus)status;
   }
 
-  String getOperator() {
+  MyString<>  getOperator() {
     sendAT(GF("+COPS?"));
     if (waitResponse(GF(GSM_NL "+COPS:")) != 1) {
       return "";
     }
     streamSkipUntil('"'); // Skip mode and format
-    String res = stream.readStringUntil('"');
-    waitResponse();
+	MyString<> res = MyString<64>::fromStreamUntil(stream, '"');    
+	waitResponse();
     return res;
   }
 
@@ -450,7 +452,7 @@ public:
     if (waitResponse(GF(GSM_NL "+CSQ:")) != 1) {
       return 99;
     }
-    int res = stream.readStringUntil(',').toInt();
+    int res = MyString<>::fromStreamUntil(stream, ',').toInt();
     waitResponse();
     return res;
   }
@@ -460,42 +462,42 @@ public:
     return (s == REG_OK_HOME || s == REG_OK_ROAMING);
   }
 
-  String getNetworkModes() {
+  MyString<> getNetworkModes() {
     sendAT(GF("+CNMP=?"));
     if (waitResponse(GF(GSM_NL "+CNMP:")) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+	MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
     waitResponse();
     return res;
   }
 
-  String setNetworkMode(uint8_t mode) {
+  MyString<> setNetworkMode(uint8_t mode) {
       sendAT(GF("+CNMP="), mode);
       if (waitResponse(GF(GSM_NL "+CNMP:")) != 1) {
         return "OK";
       }
-    String res = stream.readStringUntil('\n');
+	MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
     waitResponse();
     return res;
   }
 
-  String getPreferredModes() {
+  MyString<> getPreferredModes() {
     sendAT(GF("+CMNB=?"));
     if (waitResponse(GF(GSM_NL "+CMNB:")) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+	MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
     waitResponse();
     return res;
   }
 
-  String setPreferredMode(uint8_t mode) {
+  MyString<> setPreferredMode(uint8_t mode) {
     sendAT(GF("+CMNB="), mode);
     if (waitResponse(GF(GSM_NL "+CMNB:")) != 1) {
       return "OK";
     }
-    String res = stream.readStringUntil('\n');
+	MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
     waitResponse();
     return res;
   }
@@ -603,7 +605,7 @@ public:
     if (waitResponse(GF(GSM_NL "+CGATT:")) != 1) {
       return false;
     }
-    int res = stream.readStringUntil('\n').toInt();
+    int res = MyString<>::fromStreamUntil(stream, '\n').toInt();
     waitResponse();
     if (res != 1)
       return false;
@@ -619,9 +621,9 @@ public:
    * IP Address functions
    */
 
-  String getLocalIP() {
+    MyString<> getLocalIP() {
     sendAT(GF("+CIFSR;E0"));
-    String res;
+    MyString<> res;
     if (waitResponse(10000L, res) != 1) {
       return "";
     }
@@ -723,12 +725,12 @@ public:
    * Location functions
    */
 
-  String getGsmLocation() {
+   MyString<> getGsmLocation() {
     sendAT(GF("+CIPGSMLOC=1,1"));
     if (waitResponse(10000L, GF(GSM_NL "+CIPGSMLOC:")) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+    MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
     waitResponse();
     res.trim();
     return res;
@@ -757,12 +759,12 @@ public:
   }
 
   // get the RAW GPS output
-  String getGPSraw() {
+  MyString<> getGPSraw() {
     sendAT(GF("+CGNSINF"));
     if (waitResponse(GF(GSM_NL "+CGNSINF:")) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+    MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
     waitResponse();
     res.trim();
     return res;
@@ -778,23 +780,25 @@ public:
       return false;
     }
 
-    stream.readStringUntil(','); // mode
-    if ( stream.readStringUntil(',').toInt() == 1 ) fix = true;
-    stream.readStringUntil(','); //utctime
-    *lat =  stream.readStringUntil(',').toFloat(); //lat
-    *lon =  stream.readStringUntil(',').toFloat(); //lon
-    if (alt != NULL) *alt =  stream.readStringUntil(',').toFloat(); //lon
-    if (speed != NULL) *speed = stream.readStringUntil(',').toFloat(); //speed
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    if (vsat != NULL) *vsat = stream.readStringUntil(',').toInt(); //viewed satelites
-    if (usat != NULL) *usat = stream.readStringUntil(',').toInt(); //used satelites
-    stream.readStringUntil('\n');
+	  //  int res = MyString<>::fromStreamUntil(stream, '\n').toInt();
+
+	MyString<>::fromStreamUntil(stream, ','); // mode
+    if ( MyString<>::fromStreamUntil(stream, ',').toInt() == 1 ) fix = true;
+    MyString<>::fromStreamUntil(stream, ','); //utctime
+    *lat =  MyString<>::fromStreamUntil(stream, ',').toFloat(); //lat
+    *lon =  MyString<>::fromStreamUntil(stream, ',').toFloat(); //lon
+    if (alt != NULL) *alt =  MyString<>::fromStreamUntil(stream, ',').toFloat(); //lon
+    if (speed != NULL) *speed = MyString<>::fromStreamUntil(stream, ',').toFloat(); //speed
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+    if (vsat != NULL) *vsat = MyString<>::fromStreamUntil(stream, ',').toInt(); //viewed satelites
+    if (usat != NULL) *usat = MyString<>::fromStreamUntil(stream, ',').toInt(); //used satelites
+    MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
 
     waitResponse();
 
@@ -804,7 +808,7 @@ public:
   /*
    * Time functions
    */
-  String getGSMDateTime(TinyGSMDateTimeFormat format) {
+  MyString<> getGSMDateTime(TinyGSMDateTimeFormat format) {
     sendAT(GF("+CCLK?"));
     if (waitResponse(2000L, GF(GSM_NL "+CCLK: \"")) != 1) {
       return "";
@@ -864,7 +868,7 @@ public:
           break;
       }
     }
-    String res = stream.readStringUntil('\n');
+    MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
     waitResponse();
 
     if (fix) {
@@ -886,7 +890,7 @@ public:
     streamSkipUntil(','); // Skip
     streamSkipUntil(','); // Skip
 
-    uint16_t res = stream.readStringUntil(',').toInt();
+    uint16_t res = MyString<>::fromStreamUntil(stream, ',').toInt();
     waitResponse();
     return res;
   }
@@ -896,8 +900,8 @@ public:
     if (waitResponse(GF(GSM_NL "+CBC:")) != 1) {
       return false;
     }
-    stream.readStringUntil(',');
-    int res = stream.readStringUntil(',').toInt();
+	MyString<>::fromStreamUntil(stream, ',');
+    int res = MyString<>::fromStreamUntil(stream, ',').toInt();
     waitResponse();
     return res;
   }
@@ -932,7 +936,7 @@ protected:
       return 0;
     }
     streamSkipUntil(','); // Skip mux
-    return stream.readStringUntil('\n').toInt();
+    return  MyString<>::fromStreamUntil(stream, '\n').toInt();
   }
 
   size_t modemRead(size_t size, uint8_t mux) {
@@ -949,8 +953,8 @@ protected:
 #endif
     streamSkipUntil(','); // Skip mode 2/3
     streamSkipUntil(','); // Skip mux
-    size_t len = stream.readStringUntil(',').toInt();
-    sockets[mux]->sock_available = stream.readStringUntil('\n').toInt();
+    size_t len = MyString<>::fromStreamUntil(stream, ',').toInt();
+    sockets[mux]->sock_available = MyString<>::fromStreamUntil(stream, '\n').toInt();
 
     for (size_t i=0; i<len; i++) {
 #ifdef TINY_GSM_USE_HEX
@@ -960,7 +964,16 @@ protected:
       buf[1] = stream.read();
       char c = strtol(buf, NULL, 16);
 #else
-      while (!stream.available()) { TINY_GSM_YIELD(); }
+		  long lastChecked = millis();
+      while (!stream.available()) {
+		  TINY_GSM_YIELD();
+		  if (millis() - lastChecked > 10000) {
+			  sockets[mux]->sock_available = 0;
+			  sockets[mux]->sock_connected = false;
+			  sockets[mux]->got_data = false;
+			  return i;
+		  }
+	  }
       char c = stream.read();
 #endif
       sockets[mux]->rx.put(c);
@@ -975,7 +988,8 @@ protected:
     if (waitResponse(GF("+CIPRXGET:")) == 1) {
       streamSkipUntil(','); // Skip mode 4
       streamSkipUntil(','); // Skip mux
-      result = stream.readStringUntil('\n').toInt();
+	auto string = MyString<>::fromStreamUntil(stream, '\n');
+	  result = string.toInt();
       waitResponse();
     }
     if (!result) {
@@ -1006,7 +1020,8 @@ public:
   }
 
   // TODO: Optimize this!
-  uint8_t waitResponse(uint32_t timeout, String& data,
+  template<int N = 64>
+  uint8_t waitResponse(uint32_t timeout, MyString<N>& data,
                        GsmConstStr r1=GFP(GSM_OK), GsmConstStr r2=GFP(GSM_ERROR),
                        GsmConstStr r3=NULL, GsmConstStr r4=NULL, GsmConstStr r5=NULL)
   {
@@ -1041,9 +1056,10 @@ public:
           index = 5;
           goto finish;
         } else if (data.endsWith(GF(GSM_NL "+CIPRXGET:"))) {
-          String mode = stream.readStringUntil(',');
+			MyString<> mode;
+		  mode.readFromStreamUntil(stream, ',');									  
           if (mode.toInt() == 1) {
-            int mux = stream.readStringUntil('\n').toInt();
+            int mux = MyString<>::fromStreamUntil(stream, '\n').toInt();
             if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
               sockets[mux]->got_data = true;
             }
@@ -1060,6 +1076,17 @@ public:
           }
           data = "";
           DBG("### Closed: ", mux);
+		} else if(data.endsWith(GF("REMOTE CLOSING\""))) {
+			auto start_of = data.indexOf("CIPSTATUS:", 0) + 10;
+			auto comma = data.indexOf(",", start_of);
+
+			auto mux_str = data.substring(start_of, comma - start_of);
+			auto mux = mux_str.toInt();
+			if (mux >= 0 && mux < TINY_GSM_MUX_COUNT && sockets[mux]) {
+				sockets[mux]->sock_connected = false;
+			}
+			data = "";
+			index = 2;
         }
       }
     } while (millis() - startMillis < timeout);
@@ -1079,14 +1106,16 @@ finish:
                        GsmConstStr r1=GFP(GSM_OK), GsmConstStr r2=GFP(GSM_ERROR),
                        GsmConstStr r3=NULL, GsmConstStr r4=NULL, GsmConstStr r5=NULL)
   {
-    String data;
-    return waitResponse(timeout, data, r1, r2, r3, r4, r5);
+ MyString<> data;
+	auto res = waitResponse(timeout, data, r1, r2, r3, r4, r5);
+	return res;			
   }
 
   uint8_t waitResponse(GsmConstStr r1=GFP(GSM_OK), GsmConstStr r2=GFP(GSM_ERROR),
                        GsmConstStr r3=NULL, GsmConstStr r4=NULL, GsmConstStr r5=NULL)
   {
-    return waitResponse(1000, r1, r2, r3, r4, r5);
+	auto res = waitResponse(1000, r1, r2, r3, r4, r5);
+	return res;
   }
 
 public:
