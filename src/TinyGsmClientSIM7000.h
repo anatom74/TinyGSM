@@ -9,7 +9,7 @@
 #ifndef TinyGsmClientSIM7000_h
 #define TinyGsmClientSIM7000_h
 
-#define TINY_GSM_DEBUG Serial
+//#define TINY_GSM_DEBUG Serial
 //#define TINY_GSM_USE_HEX
 
 #if !defined(TINY_GSM_RX_BUFFER)
@@ -85,7 +85,7 @@ public:
   }
 
   virtual int connect(IPAddress ip, uint16_t port) {
-    String host; host.reserve(16);
+    MyString<16> host;
     host += ip[0];
     host += ".";
     host += ip[1];
@@ -103,16 +103,17 @@ public:
     // closes until all data is read from the buffer.
     // Doing it this way allows the external mcu to find and get all of the data
     // that it wants from the socket even if it was closed externally.
-    rx.clear();
+/*     rx.clear();
     at->maintain();
     while (sock_available > 0) {
       sock_available -= at->modemRead(TinyGsmMin((uint16_t)rx.free(), sock_available), mux);
       rx.clear();
       at->maintain();
-    }
+    } */
     at->sendAT(GF("+CIPCLOSE="), mux);
     sock_connected = false;
     at->waitResponse();
+    rx.clear();
   }
 
   virtual size_t write(const uint8_t *buf, size_t size) {
@@ -132,12 +133,12 @@ public:
 
   virtual int available() {
     TINY_GSM_YIELD();
-    if (!rx.size()) {
+    if (!rx.size()&& sock_connected) {
       // TODO:  Is this needed for SIM7000?
       // Workaround: sometimes SIM7000 forgets to notify about data arrival.
       // TODO: Currently we ping the module periodically,
       // but maybe there's a better indicator that we need to poll
-      if (millis() - prev_check > 250) {
+      if (millis() - prev_check > 500) {
         got_data = true;
         prev_check = millis();
       }
@@ -162,14 +163,14 @@ public:
       // Workaround: sometimes SIM7000 forgets to notify about data arrival.
       // TODO: Currently we ping the module periodically,
       // but maybe there's a better indicator that we need to poll
-      if (millis() - prev_check > 250) {
+/*       if (millis() - prev_check > 250) {
         got_data = true;
         prev_check = millis();
-      }
+      } */
       at->maintain();
       // TODO: Read directly into user buffer?
       if (sock_available > 0) {
-        sock_available -= at->modemRead(TinyGsmMin((uint16_t)rx.free(), sock_available), mux);
+        at->modemRead(rx.free(), mux);
       } else {
         break;
       }
@@ -260,7 +261,7 @@ public:
   }
 
   MyString<> getModemName() {
-    return "SIMCom SIM7000";
+    return "SIM7000";
   }
 
   void setBaud(unsigned long baud) {
@@ -296,7 +297,7 @@ public:
 
   MyString<> getModemInfo() {
     sendAT(GF("I"));
-    String res;
+    MyString<> res;
     if (waitResponse(1000L, res) != 1) {
       return "";
     }
@@ -383,7 +384,7 @@ public:
     if (waitResponse(GF(GSM_NL "+ICCID:")) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+    MyString<> res = MyString<>::fromStreamUntil(stream,'\n');
     waitResponse();
     res.trim();
     return res;
@@ -394,8 +395,7 @@ public:
     if (waitResponse(GF(GSM_NL)) != 1) {
       return "";
     }
-	MyString<> res;
-	res.readFromStreamUntil(stream, '\n');									   
+     MyString<> res = MyString<>::fromStreamUntil(stream,'\n');
     waitResponse();
     res.trim();
     return res;
@@ -813,19 +813,18 @@ public:
     if (waitResponse(2000L, GF(GSM_NL "+CCLK: \"")) != 1) {
       return "";
     }
-
-    String res;
+	MyString<> res;
 
     switch(format) {
       case DATE_FULL:
-        res = stream.readStringUntil('"');
+        res = MyString<>::fromStreamUntil(stream,'"');
       break;
       case DATE_TIME:
-        streamSkipUntil(',');
-        res = stream.readStringUntil('"');
+	streamSkipUntil(',');
+	res = MyString<>::fromStreamUntil(stream,'"');
       break;
       case DATE_DATE:
-        res = stream.readStringUntil(',');
+         res = MyString<>::fromStreamUntil(stream,'"');
       break;
     }
     return res;

@@ -103,16 +103,17 @@ public:
     // closes until all data is read from the buffer.
     // Doing it this way allows the external mcu to find and get all of the data
     // that it wants from the socket even if it was closed externally.
-    rx.clear();
+  /*   rx.clear();
     at->maintain();
     while (sock_available > 0) {
       sock_available -= at->modemRead(TinyGsmMin((uint16_t)rx.free(), sock_available), mux);
       rx.clear();
       at->maintain();
-    }
-    at->sendAT(GF("+CIPCLOSE="), mux, GF(",1"));  // Quick close
+    } */
+    at->sendAT(GF("+CIPCLOSE="), mux); //, GF(",1"));  // Quick close
     sock_connected = false;
     at->waitResponse();
+	rx.clear();		   
   }
 
   virtual size_t write(const uint8_t *buf, size_t size) {
@@ -132,11 +133,11 @@ public:
 
   virtual int available() {
     TINY_GSM_YIELD();
-    if (!rx.size()) {
+    if (!rx.size()&& sock_connected) {
       // Workaround: sometimes SIM800 forgets to notify about data arrival.
       // TODO: Currently we ping the module periodically,
       // but maybe there's a better indicator that we need to poll
-      if (millis() - prev_check > 250) {
+      if (millis() - prev_check > 500) {
         got_data = true;
         prev_check = millis();
       }
@@ -160,14 +161,14 @@ public:
       // Workaround: sometimes SIM800 forgets to notify about data arrival.
       // TODO: Currently we ping the module periodically,
       // but maybe there's a better indicator that we need to poll
-      if (millis() - prev_check > 250) {
+     /*  if (millis() - prev_check > 250) {
         got_data = true;
         prev_check = millis();
-      }
+      } */
       at->maintain();
       // TODO: Read directly into user buffer?
       if (sock_available > 0) {
-        sock_available -= at->modemRead(TinyGsmMin((uint16_t)rx.free(), sock_available), mux);
+        at->modemRead(rx.free(), mux);
       } else {
         break;
       }
