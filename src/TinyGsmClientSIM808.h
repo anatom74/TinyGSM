@@ -51,12 +51,12 @@ public:
 
   // get the RAW GPS output
   // works only with ans SIM808 V2
-  String getGPSraw() {
+  MyString<> getGPSraw() {
     sendAT(GF("+CGNSINF"));
     if (waitResponse(GF(GSM_NL "+CGNSINF:")) != 1) {
       return "";
     }
-    String res = stream.readStringUntil('\n');
+    MyString<> res = MyString<>::fromStreamUntil(stream,'\n');
     waitResponse();
     res.trim();
     return res;
@@ -74,23 +74,23 @@ public:
       return false;
     }
 
-    stream.readStringUntil(','); // mode
-    if ( stream.readStringUntil(',').toInt() == 1 ) fix = true;
-    stream.readStringUntil(','); //utctime
-    *lat =  stream.readStringUntil(',').toFloat(); //lat
-    *lon =  stream.readStringUntil(',').toFloat(); //lon
-    if (alt != NULL) *alt =  stream.readStringUntil(',').toFloat(); //lon
-    if (speed != NULL) *speed = stream.readStringUntil(',').toFloat(); //speed
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    stream.readStringUntil(',');
-    if (vsat != NULL) *vsat = stream.readStringUntil(',').toInt(); //viewed satelites
-    if (usat != NULL) *usat = stream.readStringUntil(',').toInt(); //used satelites
-    stream.readStringUntil('\n');
+    MyString<>::fromStreamUntil(stream, ','); // mode
+    if ( MyString<>::fromStreamUntil(stream, ',').toInt() == 1 ) fix = true;
+    MyString<>::fromStreamUntil(stream, ','); //utctime
+    *lat =  MyString<>::fromStreamUntil(stream, ',').toFloat(); //lat
+    *lon =  MyString<>::fromStreamUntil(stream, ',').toFloat(); //lon
+    if (alt != NULL) *alt =  MyString<>::fromStreamUntil(stream, ',').toFloat(); //lon
+    if (speed != NULL) *speed = MyString<>::fromStreamUntil(stream, ',').toFloat(); //speed
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+	MyString<>::fromStreamUntil(stream, ',');
+    if (vsat != NULL) *vsat = MyString<>::fromStreamUntil(stream, ',').toInt(); //viewed satelites
+    if (usat != NULL) *usat = MyString<>::fromStreamUntil(stream, ',').toInt(); //used satelites
+    MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
 
     waitResponse();
 
@@ -135,7 +135,7 @@ public:
           break;
       }
     }
-    String res = stream.readStringUntil('\n');
+    MyString<> res = MyString<>::fromStreamUntil(stream, '\n');
     waitResponse();
 
     if (fix) {

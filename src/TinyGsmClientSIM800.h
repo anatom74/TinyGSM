@@ -110,7 +110,7 @@ public:
       rx.clear();
       at->maintain();
     } */
-    at->sendAT(GF("+CIPCLOSE="), mux); //, GF(",1"));  // Quick close
+    at->sendAT(GF("+CIPCLOSE="), mux , GF(",1"));  // Quick close
     sock_connected = false;
     at->waitResponse();
 	rx.clear();		   
@@ -262,15 +262,15 @@ public:
 
   MyString<> getModemName() {
     #if defined(TINY_GSM_MODEM_SIM800)
-      return "SIMCom SIM800";
+      return PSTR("SIMCom SIM800");
     #elif defined(TINY_GSM_MODEM_SIM808)
       return "SIMCom SIM808";
     #elif defined(TINY_GSM_MODEM_SIM868)
-      return "SIMCom SIM868";
+      return (PSTR("SIM868"));
     #elif defined(TINY_GSM_MODEM_SIM900)
       return "SIMCom SIM900";
     #endif
-    return "SIMCom SIM800";
+    return (PSTR("SIM800"));
   }
 
   void setBaud(unsigned long baud) {
@@ -946,7 +946,7 @@ finish:
     if (!index) {
       data.trim();
       if (data.length()) {
-        DBG("### Unhandled:", data);
+       DBG("### Unhandled:", data);
       }
       data = "";
     }
