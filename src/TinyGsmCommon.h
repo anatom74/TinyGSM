@@ -670,7 +670,7 @@ String TinyGsmDecodeHex16bit(String &instr) {
 // Asks for modem information via the V.25TER standard ATI command
 // NOTE:  The actual value and style of the response is quite varied
 #define TINY_GSM_MODEM_GET_INFO_ATI() \
-  String getModemInfo() { \
+  MyString<> getModemInfo() { \
     sendAT(GF("I")); \
     MyString<> res; \
     if (waitResponse(1000L, res) != 1) { \
@@ -693,12 +693,12 @@ String TinyGsmDecodeHex16bit(String &instr) {
 
 // Gets the CCID of a sim card via AT+CCID
 #define TINY_GSM_MODEM_GET_SIMCCID_CCID() \
-  String getSimCCID() { \
+  MyString<> getSimCCID() { \
     sendAT(GF("+CCID")); \
     if (waitResponse(GF(GSM_NL "+CCID:")) != 1) { \
       return ""; \
     } \
-    MyString<> res = stream.readStringUntil('\n'); \
+    MyString<> res = MyString<>::fromStreamUntil(stream, '\n'); \
     waitResponse(); \
     res.trim(); \
     return res; \
@@ -707,12 +707,12 @@ String TinyGsmDecodeHex16bit(String &instr) {
 
 // Asks for TA Serial Number Identification (IMEI) via the V.25TER standard AT+GSN command
 #define TINY_GSM_MODEM_GET_IMEI_GSN() \
-  String getIMEI() { \
+  MyString<> getIMEI() { \
     sendAT(GF("+GSN")); \
     if (waitResponse(GF(GSM_NL)) != 1) { \
       return ""; \
     } \
-    String res = stream.readStringUntil('\n'); \
+    MyString<> res = MyString<>::fromStreamUntil(stream, '\n'); \
     waitResponse(); \
     res.trim(); \
     return res; \
@@ -739,7 +739,7 @@ String TinyGsmDecodeHex16bit(String &instr) {
 
 // Gets the current network operator via the 3GPP TS command AT+COPS
 #define TINY_GSM_MODEM_GET_OPERATOR_COPS() \
-  String getOperator() { \
+  MyString<> getOperator() { \
     sendAT(GF("+COPS?")); \
     if (waitResponse(GF(GSM_NL "+COPS:")) != 1) { \
       return ""; \

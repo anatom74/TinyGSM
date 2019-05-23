@@ -477,7 +477,8 @@ TINY_GSM_MODEM_WAIT_FOR_NETWORK()
   }
 
   IPAddress localIP() {
-    return TinyGsmIpFromString(getLocalIP());
+    //return TinyGsmIpFromString(getLocalIP());
+	 return IPAddress();
   }
 
   /*
@@ -920,7 +921,7 @@ finish:
                        GsmConstStr r3=NULL, GsmConstStr r4=NULL, GsmConstStr r5=NULL)
   {
     MyString<> data;
-	auto res = waitResponse(timeout, data, r1, r2, r3, r4, r5);
+	auto res = waitResponse(timeout_ms, data, r1, r2, r3, r4, r5);
 	return res;			
   }
 
